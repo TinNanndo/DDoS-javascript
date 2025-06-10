@@ -1,44 +1,21 @@
-const express = require("express");
-const cors = require("cors");
-const WebSocket = require("ws");
-const rateLimit = require("express-rate-limit");
+const { spawn } = require('child_process');
 
-const app = express();
-app.use(cors());
-
-// WebSocket server za praćenje prometa
-const wss = new WebSocket.Server({ port: 8081 });
-
-function broadcast(data) {
-  wss.clients.forEach(client => {
-    if (client.readyState === WebSocket.OPEN) {
-      client.send(JSON.stringify(data));
-    }
-  });
-}
-
-app.get('/', (req, res) => {
-    res.send('Radi')
+// Start the HTTP server
+const httpServer = spawn('node', ['unprotected.js']);
+httpServer.stdout.on('data', (data) => {
+  console.log(`HTTP: ${data}`);
+});
+httpServer.stderr.on('data', (data) => {
+  console.error(`HTTP Error: ${data}`);
 });
 
-// Nezaštićeni endpoint (ranjiv na DDoS)
-app.get("/unprotected", (req, res) => {
-  broadcast({ type: "unprotected", message: "Zahtjev primljen" });
-  res.send("Nezaštićeni server: odgovoreno");
+// Start the HTTPS server
+const httpsServer = spawn('node', ['protected.js']);
+httpsServer.stdout.on('data', (data) => {
+  console.log(`HTTPS: ${data}`);
+});
+httpsServer.stderr.on('data', (data) => {
+  console.error(`HTTPS Error: ${data}`);
 });
 
-// Zaštićeni endpoint (ograničenje zahtjeva)
-const limiter = rateLimit({
-  windowMs: 1000,
-  max: 5,
-  message: "Previše zahtjeva, pokušajte kasnije."
-});
-
-app.get("/protected", limiter, (req, res) => {
-  broadcast({ type: "protected", message: "Zahtjev primljen" });
-  res.send("Zaštićeni server: odgovoreno");
-});
-
-// Pokretanje servera
-const PORT = 3000;
-app.listen(PORT, () => console.log(`Server radi na http://localhost:${PORT}`));
+console.log('Both servers started!');
